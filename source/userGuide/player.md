@@ -1,19 +1,13 @@
 # 营员 Player：用手机玩 QQ Camp
 
-登录、把网站加到主屏幕、看钱、转钱、通知、找关卡、进出关卡。
-营员在游戏中会用到的全部功能都在这里。
-
-:::{tip}
-先看两分钟的教学影片，再看下面的文字：
-
-```{raw} html
-<video class="tutorial" controls preload="metadata" src="../raw/plan/qqCampTutorial.mp4"></video>
-```
+这个 WiKi 是给营员们大概知道 Website 的主要功能，还有要怎么样去 Setup。
+:::{important}
+在游戏开始前，请先完成步骤 1 至 4
 :::
 
 ## 1. 登录 Sign In
 
-用手机浏览器打开 **game.scmcqqcamp.com**（iPhone 用 Safari，Android 用 Chrome），会看到登录画面：
+用 Safari（iPhone）/ Chrome（Andriod）打开 **game.scmcqqcamp.com**，会看到登录画面：
 
 - **组名**：你们小组的名字。
 - **组长的IC前6位**：组长 IC 的前 6 个号码。
@@ -33,7 +27,21 @@
 ```
 :::
 
-## 2. 把网站加到主屏幕
+## 2. 第一次进来：提醒和 Welcome On Board
+
+登录后可能会先跳出窗口：
+
+- **Welcome On Board**：欢迎卡。按 **出发吧！** 会开始一段简短的 Tutorial
+
+:::{container} shots
+```{figure} images/03-welcome.png
+:class: phone
+
+Welcome On Board：出发吧！或跳过教程
+```
+:::
+
+## 3. 把网站加到主屏幕
 
 加到主屏幕之后，网站就像一个 App：点主屏幕上的图标就打开，不用每次输网址。
 
@@ -54,35 +62,40 @@
 ````
 `````
 
-## 3. 第一次进来：提醒和 Welcome On Board
+## 4. 通知：Enable notifications 和铃铛
 
-登录后可能会先跳出窗口：
+### Enable notifications
 
-- **提醒**：营会发给你们的消息，看完按按钮关掉。
-- **Welcome On Board**：欢迎卡。按 **出发吧！** 会开始一段简短的导览：画面变暗，只亮着一个地方，
-  旁边的小卡片说明它是什么，按 **下一步** 继续。导览会从钱包走到 Game Stations，介绍余额、转钱、
-  转帐记录、楼层、地图按钮、You are here、NFC 按钮和通知铃铛。
-  不想看就按 **跳过教程**。之后想再看一次，可以从通知铃铛里重新打开欢迎卡（见第 6 节）。
+:::{important}
+请先完成步骤 3
+:::
+
+这步超级超级重要，完成后你才能收到这个 Website 的 Notification
+
+1. 按 **Enable notifications** 
+2. 手机问你时选 **允许**。
+
+### 通知铃铛
+
+分页右边的 **铃铛** 是 **通知记录**，最新的在最上面。铃铛上有红点，代表有新的通知还没看。
 
 :::{container} shots
-```{figure} images/03a-reminder.png
+```{figure} images/09-bell.png
 :class: phone
 
-提醒：看完按按钮
-```
-```{figure} images/03-welcome.png
-:class: phone
-
-Welcome On Board：出发吧！或跳过教程
-```
-```{figure} images/04-tour.png
-:class: phone
-
-导览：一次介绍一个地方
+通知记录：最新的在上面
 ```
 :::
 
-## 4. 认识画面
+:::{tip}
+其他步骤可以不看，有兴趣的话可以看教学影片：
+
+```{raw} html
+<video class="tutorial" controls preload="metadata" src="../raw/plan/qqCampTutorial.mp4"></video>
+```
+:::
+
+## 5. 认识画面
 
 上面一排有两个分页，整场营会只会用到这两个：
 
@@ -94,7 +107,7 @@ Welcome On Board：出发吧！或跳过教程
 
 画面会自己更新，不用一直下拉刷新。
 
-## 5. QQ-TNG：余额、转钱、转帐记录
+## 6. QQ-TNG：余额、转钱、转帐记录
 
 ### 看余额
 
@@ -137,28 +150,6 @@ QQ-TNG：余额、转钱、转帐记录
 :class: phone
 
 转好了：记录里多了一笔
-```
-:::
-
-## 6. 通知：Enable notifications 和铃铛
-
-### Enable notifications
-
-第一次进来建议先按 **Enable notifications**，手机问你时选 **允许**。这样营会通知你们时，
-手机会直接跳出提醒，不会错过。iPhone 要先把网站加到主屏幕（第 2 节），从主屏幕图标打开，才能收到通知。
-
-### 通知铃铛
-
-分页右边的 **铃铛** 是 **通知记录**，最新的在最上面。铃铛上有红点，代表有新的通知还没看。
-
-- **提醒** 和 **Welcome On Board** 可以点开再看一次（欢迎卡点开会重新跑一次导览）。
-- 其他通知只会写什么时候、怎么结束，不能再打开。
-
-:::{container} shots
-```{figure} images/09-bell.png
-:class: phone
-
-通知记录：最新的在上面
 ```
 :::
 
@@ -263,3 +254,5 @@ iPhone：按 NFC 只显示说明
 | 没收到通知 | 按 Enable notifications 并允许；iPhone 要从主屏幕图标打开网站。也可以看铃铛里的通知记录。 |
 | 跳出「需要清除缓存」 | 按 **好**，画面会重新载入，钱包不受影响。 |
 | 画面卡住 / 空白 | 重新整理网页；还是不行就重新登录一次。 |
+
+
