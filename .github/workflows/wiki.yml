@@ -1,8 +1,8 @@
 # Builds the public qqCampWebDev Wiki and publishes it on GitHub Pages.
 #
-# This file belongs to the PUBLIC wiki repository, which publish.sh fills
-# from references/WiKi/ in the camp project. Inside the camp project it does
-# nothing: GitHub only reads .github/ at the root of a repository.
+# This workflow lives only in this public repository. The rest of it is
+# filled by publish.sh (or build.sh) from references/WiKi/ in the camp
+# project, which never overwrites .github/: edit this file here.
 #
 # Runs on every push to main, and by hand from the Actions tab (Run
 # workflow). One-time setup in the public repository:
