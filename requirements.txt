@@ -1,0 +1,7 @@
+# The wiki's build tools, installed into references/WiKi/.venv (see README.md).
+sphinx==9.2.0
+sphinx-rtd-theme==3.1.0
+myst-parser==5.2.0
+sphinx-copybutton==0.5.2
+sphinx-tabs==3.5.0
+mammoth==1.13.0

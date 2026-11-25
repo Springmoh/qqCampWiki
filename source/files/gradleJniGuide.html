@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gradle + Java + C++ (JNI) on Linux: From a Blank Machine to Master</title>
+<style>
+  :root { --bg:#fafaf9; --fg:#1c1917; --muted:#57534e; --line:#e7e5e4; --accent:#0f766e; --codebg:#1e293b; --codefg:#e2e8f0; --note:#fef3c7; --warn:#fee2e2; --tip:#dcfce7; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0c0a09; --fg:#e7e5e4; --muted:#a8a29e; --line:#292524; --accent:#2dd4bf; --codebg:#020617; --codefg:#e2e8f0; --note:#422006; --warn:#450a0a; --tip:#052e16; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 24px 18px 80px; }
+  h1 { font-size: 2rem; margin: .2em 0; }
+  h2 { margin-top: 2.4em; padding-top: .6em; border-top: 2px solid var(--line); font-size: 1.5rem; }
+  h3 { margin-top: 1.6em; font-size: 1.15rem; }
+  .sub { color: var(--muted); margin-top: 0; }
+  .level { display:inline-block; font-size:.75rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:2px 10px; border-radius:99px; background:var(--accent); color:#fff; margin-right:8px; vertical-align:middle; }
+  nav { background:var(--note); border-radius:10px; padding:14px 20px; margin:20px 0; }
+  nav ol { margin: 6px 0 0; padding-left: 22px; columns: 2; column-gap: 30px; }
+  @media (max-width: 640px) { nav ol { columns: 1; } }
+  nav a { color: inherit; }
+  a { color: var(--accent); }
+  code { background: var(--line); padding: 1px 6px; border-radius: 5px; font: .9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  figure.code { margin: 14px 0; border-radius: 10px; overflow: hidden; background: var(--codebg); }
+  figure.code figcaption { display:flex; justify-content:space-between; align-items:center; padding: 6px 12px; font: 12px ui-monospace, monospace; color:#94a3b8; background:#0f172a; }
+  figure.code button { background:#334155; color:#e2e8f0; border:0; border-radius:6px; padding:3px 10px; cursor:pointer; font-size:12px; }
+  figure.code pre { margin:0; padding: 14px; overflow-x:auto; color: var(--codefg); font: 13.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .box { border-radius:10px; padding: 12px 16px; margin: 16px 0; }
+  .note { background: var(--note); } .warn { background: var(--warn); } .tip { background: var(--tip); }
+  .box b:first-child { text-transform: uppercase; font-size: .75rem; letter-spacing: .06em; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: .93rem; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--line); }
+  ol.steps { padding-left: 22px; } ol.steps li { margin: 8px 0; }
+  .flow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:16px 0; }
+  .flow span { background:var(--accent); color:#fff; padding:8px 12px; border-radius:8px; font-size:.88rem; }
+  .flow i { font-style:normal; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Gradle + Java + C++ (JNI) on Linux</h1>
+<p class="sub">A self-learning guide that starts from a <b>blank Linux machine</b> (no JDK, no SDK, no compiler, no IDE) and ends at threads, references and exceptions. Targets: JDK 17, Gradle wrapper, CMake, g++.</p>
+
+<nav>
+<b>Contents</b>
+<ol>
+  <li><a href="#big">The big picture</a></li>
+  <li><a href="#prereq">Set up a blank Linux machine</a></li>
+  <li><a href="#idea">Create the Gradle project</a></li>
+  <li><a href="#layout">Project layout</a></li>
+  <li><a href="#java">Java side: native methods</a></li>
+  <li><a href="#header">Generate the JNI header</a></li>
+  <li><a href="#cpp">C++ side: implement the functions</a></li>
+  <li><a href="#cmake">CMake: build the .so</a></li>
+  <li><a href="#gradle">Gradle: wire it all together</a></li>
+  <li><a href="#run">Build and run</a></li>
+  <li><a href="#callback">Flow from C++ back to Java</a></li>
+  <li><a href="#types">Types, strings and arrays</a></li>
+  <li><a href="#master">Master level: threads, refs, exceptions</a></li>
+  <li><a href="#trouble">Troubleshooting</a></li>
+  <li><a href="#cheat">Cheat sheet</a></li>
+</ol>
+</nav>
+
+<!-- ============ 1 ============ -->
+<h2 id="big"><span class="level">Beginner</span>1. The big picture</h2>
+<p><b>JNI (Java Native Interface)</b> lets Java call functions written in C/C++, and lets C++ call back into Java. Java never links to your C++ source. It loads a compiled shared library (<code>.so</code> on Linux) at runtime.</p>
+<div class="flow">
+  <span>Java class with <code>native</code> method</span><i>→</i>
+  <span><code>javac -h</code> makes a C header</span><i>→</i>
+  <span>You write C++ against that header</span><i>→</i>
+  <span>CMake builds <code>libnativeBridge.so</code></span><i>→</i>
+  <span><code>System.loadLibrary</code> loads it</span><i>→</i>
+  <span>Java calls C++ (and C++ can call back)</span>
+</div>
+<p>Everything you need to get, starting from nothing:</p>
+<table>
+<tr><th>Piece</th><th>Why you need it</th><th>Where it comes from</th></tr>
+<tr><td>JDK 17 (not just a JRE)</td><td><code>javac</code> compiles Java and writes the JNI header; it also ships <code>jni.h</code> for C++</td><td>Package manager (section 2.2)</td></tr>
+<tr><td>g++ and make</td><td>Compile the C++ code</td><td>Package manager (section 2.2)</td></tr>
+<tr><td>CMake</td><td>Builds the <code>.so</code></td><td>Package manager (section 2.2)</td></tr>
+<tr><td>Gradle</td><td>Orchestrates everything</td><td>Downloaded automatically by the project's <b>Gradle wrapper</b>. No manual install.</td></tr>
+<tr><td>IntelliJ IDEA</td><td>Editor, project creation, runs Gradle tasks</td><td>Snap or JetBrains download (section 2.5)</td></tr>
+</table>
+<div class="box note"><b>Why CMake instead of Gradle's own C++ plugin?</b> The built-in Gradle C++ plugins are less commonly used and have changed a lot over time. CMake is the industry standard, works the same inside CLion/VS Code, and keeps the C++ side independent of Gradle. Gradle just calls it.</div>
+
+<!-- ============ 2 ============ -->
+<h2 id="prereq"><span class="level">Beginner</span>2. Set up a blank Linux machine</h2>
+<p>Assume a fresh install: no Java, no compiler, no Gradle, no IDE. Do these steps in order. You need an internet connection and <code>sudo</code> rights.</p>
+
+<h3>2.1 Know your distribution</h3>
+<script type="text/plain" data-lang="bash" data-file="terminal">cat /etc/os-release | head -n 3
+uname -m</script>
+<p><code>uname -m</code> prints <code>x86_64</code> (Intel/AMD) or <code>aarch64</code> (ARM). A <code>.so</code> you build only runs on the same architecture.</p>
+
+<h3>2.2 Install the JDK, compiler, CMake and helpers</h3>
+<p>Pick the block for your distribution. All three install the same things: JDK 17, g++, make, CMake, and <code>curl</code>/<code>unzip</code>/<code>git</code> for later steps.</p>
+<script type="text/plain" data-lang="bash" data-file="Debian / Ubuntu / Mint">sudo apt update
+sudo apt install -y openjdk-17-jdk build-essential cmake curl unzip zip git</script>
+<script type="text/plain" data-lang="bash" data-file="Fedora / RHEL family">sudo dnf install -y java-17-openjdk-devel gcc-c++ make cmake curl unzip zip git</script>
+<script type="text/plain" data-lang="bash" data-file="Arch / Manjaro">sudo pacman -S --needed jdk17-openjdk base-devel cmake curl unzip zip git
+sudo archlinux-java set java-17-openjdk</script>
+<div class="box warn"><b>Common trap</b> Installing only <code>openjdk-17-jre</code> (no <code>-jdk</code> / <code>-devel</code>) gives you no <code>javac</code> and no <code>jni.h</code>. You need the JDK.</div>
+<div class="box note"><b>Package not found?</b> Very old distributions may lack JDK 17. Use <code>openjdk-21-jdk</code> instead and change <code>JavaLanguageVersion.of(17)</code> to <code>21</code> in section 9, or use SDKMAN in 2.6.</div>
+
+<h3>2.3 Set JAVA_HOME</h3>
+<p>CMake's <code>find_package(JNI)</code> finds <code>jni.h</code> through <code>JAVA_HOME</code>. This line derives it from wherever <code>javac</code> really lives, so it works on every distribution:</p>
+<script type="text/plain" data-lang="bash" data-file="~/.bashrc  (append at the end)">export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
+export PATH=$JAVA_HOME/bin:$PATH</script>
+<p>Apply it to the current terminal and check it:</p>
+<script type="text/plain" data-lang="bash" data-file="terminal">source ~/.bashrc
+echo $JAVA_HOME
+ls $JAVA_HOME/include/jni.h</script>
+<p>The last command must print a path. If it says "No such file", you installed a JRE only. Go back to 2.2. Using zsh? Put the same two lines in <code>~/.zshrc</code>.</p>
+
+<h3>2.3a If more than one JDK is installed (for example 17 and 25)</h3>
+<p>Many systems end up with several JDKs, and the newest one often becomes the default. IntelliJ lists them all in the Gradle JVM dropdown, and your <code>JAVA_HOME</code> line follows whichever <code>javac</code> is the default. For this guide, make <b>everything use JDK 17</b>:</p>
+<table>
+<tr><th>Place</th><th>What to choose</th></tr>
+<tr><td>Shell (<code>javac</code> / <code>JAVA_HOME</code>)</td><td>JDK 17 via <code>update-alternatives</code> (below)</td></tr>
+<tr><td>IntelliJ → Gradle JVM</td><td>The <b>17</b> entry (for example "17 Java 17.0.20")</td></tr>
+<tr><td>IntelliJ → Project SDK</td><td>17</td></tr>
+<tr><td><code>build.gradle</code> toolchain</td><td><code>JavaLanguageVersion.of(17)</code> (already set in section 9)</td></tr>
+</table>
+<p>Switch the system default to 17 (pick the 17 entry in both menus):</p>
+<script type="text/plain" data-lang="bash" data-file="terminal (Debian / Ubuntu)">sudo update-alternatives --config javac
+sudo update-alternatives --config java</script>
+<p>Open a new terminal and confirm:</p>
+<script type="text/plain" data-lang="bash" data-file="terminal">echo $JAVA_HOME                 # expect /usr/lib/jvm/java-17-openjdk-amd64
+ls $JAVA_HOME/include/jni.h
+javac -version                  # expect javac 17.x</script>
+<p>If you already built once with the wrong JDK, wipe the old CMake cache (it remembers the old JDK paths):</p>
+<script type="text/plain" data-lang="bash" data-file="terminal (project root)">./gradlew clean run</script>
+<div class="box warn"><b>Why not just leave it on 25?</b> The Java side is compiled by the toolchain JDK (17), but CMake builds the <code>.so</code> against whatever <code>JAVA_HOME</code> points to. If those differ, Java and C++ are built on different JDKs. JNI is stable, so it often still works, but you add a mismatch you do not need while learning. Also, running Gradle itself on JDK 25 needs Gradle 9.1 or newer, and the wrapper IntelliJ downloads may be older.</div>
+<div class="box note"><b>Want to use 25 on purpose?</b> Change all four places in the table above to 25 (<code>JavaLanguageVersion.of(25)</code> in <code>build.gradle</code>), re-run <code>update-alternatives</code> choosing 25, and make sure the project's Gradle wrapper is 9.1 or newer (<code>./gradlew --version</code>).</div>
+
+<h3>2.4 Verify the whole toolchain</h3>
+<p>Save this as <code>checkEnv.sh</code> anywhere, then run it. Every line should say <code>OK</code>.</p>
+<script type="text/plain" data-lang="bash" data-file="checkEnv.sh">#!/usr/bin/env bash
+check() {
+  if command -v "$1" >/dev/null 2>&1; then echo "OK       $1"; else echo "MISSING  $1"; fi
+}
+for tool in java javac g++ make cmake git curl unzip; do check "$tool"; done
+
+echo "JAVA_HOME = ${JAVA_HOME:-<not set>}"
+if [ -f "$JAVA_HOME/include/jni.h" ]; then
+  echo "OK       jni.h found"
+else
+  echo "MISSING  jni.h (install the JDK, not the JRE, and set JAVA_HOME)"
+fi
+javac -version 2>&1
+g++ --version | head -n 1
+cmake --version | head -n 1</script>
+<script type="text/plain" data-lang="bash" data-file="terminal">bash checkEnv.sh</script>
+
+<h3>2.5 Install IntelliJ IDEA</h3>
+<p>Choose one method.</p>
+<table>
+<tr><th>Method</th><th>Steps</th></tr>
+<tr><td>Snap (Ubuntu, easiest)</td><td><code>sudo snap install intellij-idea-community --classic</code><br>JetBrains has been reorganising its editions, so if this snap name is not found, use one of the other two methods.</td></tr>
+<tr><td>JetBrains Toolbox</td><td>Download Toolbox from <code>jetbrains.com/toolbox-app</code>, extract the archive, run the <code>jetbrains-toolbox</code> binary, then install IntelliJ IDEA from its list.</td></tr>
+<tr><td>Tarball (any distro)</td><td>Download the Linux <code>.tar.gz</code> from <code>jetbrains.com/idea/download</code>, then:<br><code>sudo tar -xzf ~/Downloads/ideaIC-*.tar.gz -C /opt</code><br><code>/opt/idea-*/bin/idea.sh</code><br>(inside IntelliJ: <b>Tools → Create Desktop Entry</b> to get a launcher icon)</td></tr>
+</table>
+<div class="box note"><b>No desktop / SSH-only server?</b> Skip IntelliJ and follow the <b>terminal-only route</b> in section 3. Everything else in this guide is identical.</div>
+
+<h3>2.6 Optional: terminal-only Gradle via SDKMAN</h3>
+<p>You only need this if you are <i>not</i> using IntelliJ to create the project. IntelliJ creates and downloads the Gradle wrapper for you.</p>
+<script type="text/plain" data-lang="bash" data-file="terminal">curl -s "https://get.sdkman.io" | bash
+source "$HOME/.sdkman/bin/sdkman-init.sh"
+sdk install gradle
+gradle --version</script>
+<p>SDKMAN also lets you install other JDKs later (<code>sdk list java</code>, <code>sdk install java 17.x.y-tem</code>). If you use it, point <code>JAVA_HOME</code> at the SDKMAN JDK, not the apt one, so CMake and Gradle agree.</p>
+<div class="box tip"><b>Result</b> After section 2 you have: JDK 17, g++, make, CMake, <code>JAVA_HOME</code>, and an IDE. Gradle itself arrives in the next section through the wrapper. Gradle downloads its own distribution on first use, so the first run needs internet access.</div>
+
+<!-- ============ 3 ============ -->
+<h2 id="idea"><span class="level">Beginner</span>3. Create the Gradle project</h2>
+
+<h3>Route A: IntelliJ</h3>
+<ol class="steps">
+<li>Start IntelliJ. On first launch accept the licence terms and choose a theme.</li>
+<li><b>New Project</b> (or <b>File → New → Project</b>). Left panel: choose <b>Java</b>.</li>
+<li>Set these fields:
+  <table>
+  <tr><th>Field</th><th>Value</th></tr>
+  <tr><td>Name</td><td><code>jniDemo</code></td></tr>
+  <tr><td>Location</td><td>any folder you like</td></tr>
+  <tr><td>Build system</td><td><b>Gradle</b></td></tr>
+  <tr><td>Gradle DSL</td><td><b>Groovy</b> (this guide uses <code>build.gradle</code>)</td></tr>
+  <tr><td>JDK</td><td>Pick the JDK 17 under <code>/usr/lib/jvm</code> that you installed in 2.2. If the list is empty, use <b>Add JDK from disk</b> and select <code>$JAVA_HOME</code>.</td></tr>
+  <tr><td>Add sample code</td><td>untick</td></tr>
+  <tr><td>GroupId / ArtifactId</td><td><code>com.example</code> / <code>jniDemo</code></td></tr>
+  </table>
+</li>
+<li>Click <b>Create</b>. IntelliJ downloads Gradle and syncs. Wait for the progress bar at the bottom to finish.</li>
+<li>Check the Gradle JVM: <b>File → Settings → Build, Execution, Deployment → Build Tools → Gradle</b>. Set <b>Gradle JVM</b> to your JDK 17.</li>
+<li>On the same page set <b>Build and run using: Gradle</b> so IntelliJ uses the same path as the terminal.</li>
+</ol>
+<div class="box warn"><b>Use the system JDK, not a downloaded one</b> IntelliJ can download its own JDK into <code>~/.jdks</code>. That is fine for Java, but CMake reads <code>JAVA_HOME</code> from your shell. If the two differ, you can get header or version mismatches. Stick to one JDK, the one from 2.2. If the Gradle JVM dropdown also shows newer JDKs (such as 25), still choose 17 and see section 2.3a.</div>
+
+<h3>Route B: terminal only (no IDE)</h3>
+<p>Needs SDKMAN Gradle from 2.6. Create the folders, then (after you add the files in sections 4 to 9) generate the wrapper once:</p>
+<script type="text/plain" data-lang="bash" data-file="terminal">mkdir -p jniDemo/src/main/java/com/example/jni jniDemo/src/main/cpp
+cd jniDemo
+# ...create settings.gradle and build.gradle (section 9)...
+gradle wrapper
+./gradlew --version</script>
+<p>After that, <code>./gradlew</code> is all you use, and the SDKMAN Gradle is no longer needed for this project.</p>
+
+<div class="box note"><b>C++ editing in IntelliJ</b> IntelliJ IDEA Community has no C++ support. You can still edit <code>.cpp</code> files as plain text, or open <code>src/main/cpp</code> in CLion / VS Code for code completion. The build is unaffected, because Gradle calls CMake from the command line.</div>
+
+<!-- ============ 4 ============ -->
+<h2 id="layout"><span class="level">Beginner</span>4. Project layout</h2>
+<p>Create the folders and files below (right-click → New in IntelliJ, or use the terminal). The Java package folders must match the <code>package</code> line.</p>
+<script type="text/plain" data-lang="text" data-file="project tree">jniDemo/
+├── build.gradle
+├── settings.gradle
+├── gradlew, gradlew.bat, gradle/       (created by IntelliJ or "gradle wrapper")
+└── src/main/
+    ├── java/com/example/jni/
+    │   ├── Main.java
+    │   └── NativeBridge.java
+    └── cpp/
+        ├── CMakeLists.txt
+        └── nativeBridge.cpp</script>
+<p>Generated at build time (never edit these by hand):</p>
+<script type="text/plain" data-lang="text" data-file="build output">build/generated/jni/com_example_jni_NativeBridge.h   (JNI header)
+build/native/libnativeBridge.so                     (your compiled C++)</script>
+
+<!-- ============ 5 ============ -->
+<h2 id="java"><span class="level">Beginner</span>5. Java side: declare native methods</h2>
+<p>A <code>native</code> method has no body in Java. Its body lives in C++. The <code>static</code> block loads the library when the class is first used.</p>
+<script type="text/plain" data-lang="java" data-file="src/main/java/com/example/jni/NativeBridge.java">package com.example.jni;
+
+public class NativeBridge {
+
+    static {
+        // Looks for libnativeBridge.so on java.library.path.
+        // Note: no "lib" prefix and no ".so" here.
+        System.loadLibrary("nativeBridge");
+    }
+
+    // ---- Java -> C++ ----
+    public native int add(int a, int b);
+    public native String greet(String name);
+    public native void startWork(int stepCount);
+
+    // ---- C++ -> Java (called from native code, see section 11) ----
+    public void onProgress(int percent, String message) {
+        System.out.println("[Java] progress " + percent + "% : " + message);
+    }
+}</script>
+<script type="text/plain" data-lang="java" data-file="src/main/java/com/example/jni/Main.java">package com.example.jni;
+
+public class Main {
+    public static void main(String[] args) {
+        NativeBridge bridge = new NativeBridge();
+
+        int sum = bridge.add(2, 40);
+        System.out.println("add(2, 40) = " + sum);
+
+        System.out.println(bridge.greet("Nian Chun"));
+
+        bridge.startWork(4);   // C++ will call onProgress() back into Java
+    }
+}</script>
+
+<!-- ============ 6 ============ -->
+<h2 id="header"><span class="level">Beginner</span>6. Generate the JNI header</h2>
+<p>The exact C++ function names are strict: <code>Java_</code> + package (dots become underscores) + <code>_</code> + class + <code>_</code> + method. Typing them by hand invites typos, so let <code>javac</code> generate the header with the <code>-h</code> flag. In Gradle this is one property (set in section 9):</p>
+<script type="text/plain" data-lang="groovy" data-file="build.gradle (excerpt)">tasks.withType(JavaCompile).configureEach {
+    options.headerOutputDirectory.set(layout.buildDirectory.dir('generated/jni'))
+}</script>
+<p>After a build, open <code>build/generated/jni/com_example_jni_NativeBridge.h</code>. You will see signatures like:</p>
+<script type="text/plain" data-lang="c" data-file="generated header (read only)">JNIEXPORT jint JNICALL Java_com_example_jni_NativeBridge_add
+  (JNIEnv *, jobject, jint, jint);</script>
+<p>Every native function receives two hidden leading parameters:</p>
+<table>
+<tr><th>Parameter</th><th>Meaning</th></tr>
+<tr><td><code>JNIEnv* env</code></td><td>Your toolbox for talking to the JVM (create strings, call Java methods, throw exceptions). Valid only on the current thread.</td></tr>
+<tr><td><code>jobject self</code></td><td>The Java object the method was called on (<code>this</code>). For a <code>static native</code> method this is <code>jclass</code> instead.</td></tr>
+</table>
+
+<!-- ============ 7 ============ -->
+<h2 id="cpp"><span class="level">Beginner</span>7. C++ side: implement the functions</h2>
+<p>Copy each signature from the generated header and add a body. Start with the simple ones.</p>
+<script type="text/plain" data-lang="cpp" data-file="src/main/cpp/nativeBridge.cpp">#include "com_example_jni_NativeBridge.h"
+#include <string>
+
+// int add(int a, int b)
+JNIEXPORT jint JNICALL Java_com_example_jni_NativeBridge_add
+  (JNIEnv* env, jobject self, jint a, jint b)
+{
+    return a + b;
+}
+
+// String greet(String name)
+JNIEXPORT jstring JNICALL Java_com_example_jni_NativeBridge_greet
+  (JNIEnv* env, jobject self, jstring name)
+{
+    // 1. Java String -> C string (must be released afterwards)
+    const char* nameChars = env->GetStringUTFChars(name, nullptr);
+    if (nameChars == nullptr) {
+        return nullptr;               // OutOfMemoryError already pending
+    }
+
+    // 2. Do C++ work
+    std::string message = std::string("Hello, ") + nameChars + " (from C++)";
+
+    // 3. Release the C string, then build a new Java String
+    env->ReleaseStringUTFChars(name, nameChars);
+    return env->NewStringUTF(message.c_str());
+}</script>
+<p><code>startWork</code> comes in section 11, once you understand callbacks. For now, add an empty stub so the library links:</p>
+<script type="text/plain" data-lang="cpp" data-file="src/main/cpp/nativeBridge.cpp (append)">JNIEXPORT void JNICALL Java_com_example_jni_NativeBridge_startWork
+  (JNIEnv* env, jobject self, jint stepCount)
+{
+    // implemented in section 11
+}</script>
+
+<!-- ============ 8 ============ -->
+<h2 id="cmake"><span class="level">Beginner</span>8. CMake: build the shared library</h2>
+<script type="text/plain" data-lang="cmake" data-file="src/main/cpp/CMakeLists.txt">cmake_minimum_required(VERSION 3.16)
+project(nativeBridge CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Finds jni.h using JAVA_HOME
+find_package(JNI REQUIRED)
+
+# JNI_HEADER_DIR is passed in by Gradle (folder with the generated .h)
+add_library(nativeBridge SHARED nativeBridge.cpp)
+
+target_include_directories(nativeBridge PRIVATE
+    ${JNI_INCLUDE_DIRS}
+    ${JNI_HEADER_DIR}
+)
+
+# Position-independent code is required for shared libraries
+set_target_properties(nativeBridge PROPERTIES POSITION_INDEPENDENT_CODE ON)</script>
+<p>The target name <code>nativeBridge</code> produces <code>libnativeBridge.so</code>. That is why Java calls <code>System.loadLibrary("nativeBridge")</code>.</p>
+
+<!-- ============ 9 ============ -->
+<h2 id="gradle"><span class="level">Intermediate</span>9. Gradle: wire it all together</h2>
+<script type="text/plain" data-lang="groovy" data-file="settings.gradle">rootProject.name = 'jniDemo'</script>
+<script type="text/plain" data-lang="groovy" data-file="build.gradle">plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.example'
+version = '1.0'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+application {
+    mainClass = 'com.example.jni.Main'
+}
+
+// ---------- paths ----------
+def nativeSrcDir   = file('src/main/cpp')
+def nativeBuildDir = layout.buildDirectory.dir('native').get().asFile
+def jniHeaderDir   = layout.buildDirectory.dir('generated/jni').get().asFile
+
+// ---------- 1. javac writes the JNI header ----------
+tasks.withType(JavaCompile).configureEach {
+    options.headerOutputDirectory.set(layout.buildDirectory.dir('generated/jni'))
+}
+
+// ---------- 2. CMake configure ----------
+tasks.register('configureNative', Exec) {
+    dependsOn tasks.named('compileJava')   // header must exist first
+    commandLine 'cmake',
+        '-S', nativeSrcDir.absolutePath,
+        '-B', nativeBuildDir.absolutePath,
+        "-DJNI_HEADER_DIR=${jniHeaderDir.absolutePath}",
+        '-DCMAKE_BUILD_TYPE=Release'
+}
+
+// ---------- 3. CMake build (makes libnativeBridge.so) ----------
+tasks.register('buildNative', Exec) {
+    dependsOn 'configureNative'
+    commandLine 'cmake', '--build', nativeBuildDir.absolutePath
+}
+
+// ---------- 4. Run Java with the .so on java.library.path ----------
+tasks.named('run') {
+    dependsOn 'buildNative'
+    systemProperty 'java.library.path', nativeBuildDir.absolutePath
+}
+
+// ---------- tidy: also wipe native output on clean ----------
+tasks.named('clean') {
+    delete nativeBuildDir
+}</script>
+<p>What each piece does:</p>
+<table>
+<tr><th>Task</th><th>Does</th><th>Depends on</th></tr>
+<tr><td><code>compileJava</code></td><td>Compiles Java and writes the header</td><td>-</td></tr>
+<tr><td><code>configureNative</code></td><td>Runs <code>cmake -S ... -B ...</code></td><td><code>compileJava</code></td></tr>
+<tr><td><code>buildNative</code></td><td>Runs <code>cmake --build</code> and produces the <code>.so</code></td><td><code>configureNative</code></td></tr>
+<tr><td><code>run</code></td><td>Starts <code>Main</code> with the library path set</td><td><code>buildNative</code></td></tr>
+</table>
+<div class="box note"><b>Why does <code>java.library.path</code> matter?</b> <code>System.loadLibrary</code> only searches the directories listed there. If the path is wrong you get <code>UnsatisfiedLinkError: no nativeBridge in java.library.path</code>.</div>
+
+<!-- ============ 10 ============ -->
+<h2 id="run"><span class="level">Intermediate</span>10. Build and run</h2>
+<h3>From IntelliJ</h3>
+<ol class="steps">
+<li>Click the <b>Gradle</b> elephant icon on the right edge → click the <b>reload</b> button (sync).</li>
+<li>Expand <b>jniDemo → Tasks → application</b> → double-click <b>run</b>.</li>
+<li>Output appears in the Run window.</li>
+</ol>
+<h3>From the terminal</h3>
+<script type="text/plain" data-lang="bash" data-file="terminal (project root)">chmod +x gradlew          # first time only
+./gradlew run</script>
+<p>The very first run downloads Gradle and then builds, so it takes a while. Expected output (the progress lines appear after section 11):</p>
+<script type="text/plain" data-lang="text" data-file="expected output">add(2, 40) = 42
+Hello, Nian Chun (from C++)</script>
+<p>Useful extra commands:</p>
+<script type="text/plain" data-lang="bash" data-file="terminal">./gradlew buildNative      # only rebuild the C++ library
+./gradlew clean run        # full rebuild
+nm -D build/native/libnativeBridge.so | grep Java_   # list exported JNI symbols</script>
+
+<!-- ============ 11 ============ -->
+<h2 id="callback"><span class="level">Intermediate</span>11. Flow from C++ back to Java</h2>
+<p>This is the part that confuses most beginners. A callback is four steps inside C++:</p>
+<div class="flow">
+  <span>1. <code>GetObjectClass</code></span><i>→</i>
+  <span>2. <code>GetMethodID</code> (name + signature)</span><i>→</i>
+  <span>3. build arguments</span><i>→</i>
+  <span>4. <code>CallVoidMethod</code></span>
+</div>
+<p>Replace the <code>startWork</code> stub in <code>nativeBridge.cpp</code>:</p>
+<script type="text/plain" data-lang="cpp" data-file="src/main/cpp/nativeBridge.cpp (replace startWork)">JNIEXPORT void JNICALL Java_com_example_jni_NativeBridge_startWork
+  (JNIEnv* env, jobject self, jint stepCount)
+{
+    // 1. Which class is "self"?
+    jclass bridgeClass = env->GetObjectClass(self);
+
+    // 2. Find onProgress(int, String) -> void
+    //    Signature: ( I Ljava/lang/String; ) V
+    jmethodID onProgressId = env->GetMethodID(
+        bridgeClass, "onProgress", "(ILjava/lang/String;)V");
+    if (onProgressId == nullptr) {
+        return;   // NoSuchMethodError is already pending in the JVM
+    }
+
+    for (int step = 1; step <= stepCount; ++step) {
+        // ... real C++ work would go here ...
+
+        int percent = step * 100 / stepCount;
+
+        // 3. Build Java arguments
+        std::string text = "finished step " + std::to_string(step);
+        jstring message = env->NewStringUTF(text.c_str());
+
+        // 4. Call back into Java, on the same object
+        env->CallVoidMethod(self, onProgressId, (jint)percent, message);
+
+        // Free the local reference inside loops (see section 13)
+        env->DeleteLocalRef(message);
+
+        if (env->ExceptionCheck()) {
+            return;   // Java threw inside the callback; stop and let it propagate
+        }
+    }
+}</script>
+<p>Run <code>./gradlew run</code> again. You should now see:</p>
+<script type="text/plain" data-lang="text" data-file="expected output">add(2, 40) = 42
+Hello, Nian Chun (from C++)
+[Java] progress 25% : finished step 1
+[Java] progress 50% : finished step 2
+[Java] progress 75% : finished step 3
+[Java] progress 100% : finished step 4</script>
+<p>The whole round trip, in order:</p>
+<table>
+<tr><th>#</th><th>Where</th><th>What happens</th></tr>
+<tr><td>1</td><td>Java</td><td><code>bridge.startWork(4)</code> is called</td></tr>
+<tr><td>2</td><td>JVM</td><td>Finds <code>Java_com_example_jni_NativeBridge_startWork</code> in the loaded <code>.so</code></td></tr>
+<tr><td>3</td><td>C++</td><td>Loop runs; each step calls <code>CallVoidMethod</code></td></tr>
+<tr><td>4</td><td>Java</td><td><code>onProgress()</code> runs, prints a line, returns</td></tr>
+<tr><td>5</td><td>C++</td><td>Loop ends, function returns</td></tr>
+<tr><td>6</td><td>Java</td><td>Execution continues after <code>startWork</code></td></tr>
+</table>
+<div class="box note"><b>Where do signatures like <code>(ILjava/lang/String;)V</code> come from?</b> You can print them: <code>javap -s -p -cp build/classes/java/main com.example.jni.NativeBridge</code>. Look for the <code>descriptor:</code> lines. Never guess them.</div>
+
+<!-- ============ 12 ============ -->
+<h2 id="types"><span class="level">Intermediate</span>12. Types, strings and arrays</h2>
+<table>
+<tr><th>Java</th><th>JNI / C++</th><th>Descriptor letter</th></tr>
+<tr><td><code>boolean</code></td><td><code>jboolean</code></td><td><code>Z</code></td></tr>
+<tr><td><code>byte</code></td><td><code>jbyte</code></td><td><code>B</code></td></tr>
+<tr><td><code>char</code></td><td><code>jchar</code></td><td><code>C</code></td></tr>
+<tr><td><code>short</code></td><td><code>jshort</code></td><td><code>S</code></td></tr>
+<tr><td><code>int</code></td><td><code>jint</code></td><td><code>I</code></td></tr>
+<tr><td><code>long</code></td><td><code>jlong</code></td><td><code>J</code></td></tr>
+<tr><td><code>float</code></td><td><code>jfloat</code></td><td><code>F</code></td></tr>
+<tr><td><code>double</code></td><td><code>jdouble</code></td><td><code>D</code></td></tr>
+<tr><td><code>void</code></td><td><code>void</code></td><td><code>V</code></td></tr>
+<tr><td><code>String</code></td><td><code>jstring</code></td><td><code>Ljava/lang/String;</code></td></tr>
+<tr><td><code>int[]</code></td><td><code>jintArray</code></td><td><code>[I</code></td></tr>
+<tr><td>any object</td><td><code>jobject</code></td><td><code>Lpackage/Class;</code></td></tr>
+</table>
+<h3>Example: sum an int array</h3>
+<p>Add to <code>NativeBridge.java</code>:</p>
+<script type="text/plain" data-lang="java" data-file="NativeBridge.java (add)">public native long sumArray(int[] values);</script>
+<p>Then implement it (copy the exact signature from the regenerated header):</p>
+<script type="text/plain" data-lang="cpp" data-file="nativeBridge.cpp (add)">JNIEXPORT jlong JNICALL Java_com_example_jni_NativeBridge_sumArray
+  (JNIEnv* env, jobject self, jintArray values)
+{
+    jsize length = env->GetArrayLength(values);
+
+    // Copy-in is the safest option for beginners
+    std::vector<jint> buffer(length);
+    env->GetIntArrayRegion(values, 0, length, buffer.data());
+
+    jlong total = 0;
+    for (jint v : buffer) {
+        total += v;
+    }
+    return total;
+}</script>
+<p>Remember to add <code>#include &lt;vector&gt;</code> at the top. Prefer <code>Get&lt;Type&gt;ArrayRegion</code> / <code>Set&lt;Type&gt;ArrayRegion</code> (copy a slice) over <code>Get&lt;Type&gt;ArrayElements</code> unless you really need direct access, because the latter needs a matching <code>Release</code> call.</p>
+
+<!-- ============ 13 ============ -->
+<h2 id="master"><span class="level">Master</span>13. Master level: references, threads, exceptions</h2>
+
+<h3>13.1 The three kinds of references</h3>
+<table>
+<tr><th>Kind</th><th>Lifetime</th><th>Use</th></tr>
+<tr><td>Local</td><td>Until the native function returns</td><td>Default for everything JNI gives you. Call <code>DeleteLocalRef</code> inside long loops (the table is limited, around 512 by default).</td></tr>
+<tr><td>Global</td><td>Until you call <code>DeleteGlobalRef</code></td><td>Anything you store in a C++ variable between calls (e.g. a <code>jobject</code> callback listener, a <code>jclass</code>).</td></tr>
+<tr><td>Weak global</td><td>Until the GC collects it</td><td>Caches that must not keep objects alive.</td></tr>
+</table>
+<div class="box warn"><b>Never</b> store a <code>JNIEnv*</code>, a local <code>jobject</code> or a local <code>jclass</code> in a global or static C++ variable and use it later. <code>jmethodID</code> and <code>jfieldID</code> are safe to cache.</div>
+
+<h3>13.2 Calling Java from a C++ thread</h3>
+<p>A background C++ thread has no <code>JNIEnv</code>. You must attach it to the JVM first. Save the <code>JavaVM*</code> in <code>JNI_OnLoad</code>, which the JVM calls once when the library loads:</p>
+<script type="text/plain" data-lang="cpp" data-file="nativeBridge.cpp (advanced)">#include <thread>
+
+static JavaVM* JAVA_VM = nullptr;       // global: capital SNAKE_CASE
+static jobject LISTENER_REF = nullptr;  // global reference to the Java object
+static jmethodID ON_PROGRESS_ID = nullptr;
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved)
+{
+    JAVA_VM = vm;
+    return JNI_VERSION_1_8;
+}
+
+static void workerLoop()
+{
+    JNIEnv* env = nullptr;
+    // Attach this native thread to the JVM
+    if (JAVA_VM->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
+        return;
+    }
+
+    jstring message = env->NewStringUTF("hello from a C++ thread");
+    env->CallVoidMethod(LISTENER_REF, ON_PROGRESS_ID, (jint)100, message);
+    env->DeleteLocalRef(message);
+
+    // Always detach before the thread exits
+    JAVA_VM->DetachCurrentThread();
+}
+
+JNIEXPORT void JNICALL Java_com_example_jni_NativeBridge_startThread
+  (JNIEnv* env, jobject self)
+{
+    // Pin the Java object with a GLOBAL ref so the thread can use it later
+    LISTENER_REF = env->NewGlobalRef(self);
+
+    jclass cls = env->GetObjectClass(self);
+    ON_PROGRESS_ID = env->GetMethodID(cls, "onProgress", "(ILjava/lang/String;)V");
+
+    std::thread(workerLoop).detach();
+}</script>
+<p>For this to compile, add <code>public native void startThread();</code> to <code>NativeBridge.java</code>. Link with threads if needed by adding <code>find_package(Threads REQUIRED)</code> and <code>target_link_libraries(nativeBridge PRIVATE Threads::Threads)</code> to CMake. If the C++ code writes shared data from several threads, protect it with a <code>std::mutex</code>. Note that a detached thread may still be running when <code>main</code> finishes, so in a demo give it time (for example <code>Thread.sleep(500)</code> after the call in <code>Main</code>).</p>
+<div class="box warn"><b>Important</b> Release the global reference (<code>DeleteGlobalRef</code>) when you stop the worker, otherwise the Java object can never be garbage collected.</div>
+
+<h3>13.3 Throwing exceptions from C++</h3>
+<script type="text/plain" data-lang="cpp" data-file="nativeBridge.cpp (example)">static void throwJava(JNIEnv* env, const char* className, const char* text)
+{
+    jclass cls = env->FindClass(className);
+    if (cls != nullptr) {
+        env->ThrowNew(cls, text);
+    }
+}
+
+// usage inside a native function:
+//   throwJava(env, "java/lang/IllegalArgumentException", "count must be > 0");
+//   return;   // IMPORTANT: a pending exception only fires after you return</script>
+<p>Never let a C++ exception escape a JNI function. It will crash the JVM. Wrap risky code in <code>try { ... } catch (const std::exception&amp; e) { throwJava(...); }</code>.</p>
+
+<h3>13.4 Registering natives manually (optional)</h3>
+<p>Instead of the long <code>Java_..._name</code> convention you can register functions in <code>JNI_OnLoad</code> with <code>RegisterNatives</code>. It gives shorter names, a small speed-up, and lets you rename a Java package without touching C++ symbol names. Learn the default convention first; switch later if the project grows.</p>
+
+<h3>13.5 Packaging for distribution</h3>
+<ul>
+<li>A plain <code>.jar</code> does not contain your <code>.so</code>. Either ship the <code>.so</code> next to the jar and set <code>-Djava.library.path=...</code>, or bundle it as a resource and extract it to a temp file before <code>System.load(absolutePath)</code>.</li>
+<li>The <code>.so</code> is compiled for one CPU architecture (x86_64 vs aarch64). Build one per target.</li>
+<li><code>./gradlew installDist</code> creates <code>build/install/jniDemo/</code> with a start script. Pass the library path via <code>applicationDefaultJvmArgs</code> in the <code>application { }</code> block.</li>
+</ul>
+
+<h3>13.6 Debugging tips</h3>
+<ul>
+<li>Run with <code>-Xcheck:jni</code> (<code>jvmArgs '-Xcheck:jni'</code> in the <code>run</code> task) to catch many JNI misuse bugs with readable messages.</li>
+<li>Compile the C++ with <code>-g</code> (<code>-DCMAKE_BUILD_TYPE=Debug</code>) and attach <code>gdb</code> to the java process when you need native stack traces. Install it with your package manager (<code>sudo apt install gdb</code>).</li>
+<li>Log to <code>stderr</code> from C++ while learning. <code>std::cerr</code> shows in the Run window.</li>
+</ul>
+
+<!-- ============ 14 ============ -->
+<h2 id="trouble"><span class="level">Reference</span>14. Troubleshooting</h2>
+<table>
+<tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+<tr><td><code>javac: command not found</code> or <code>jni.h</code> missing</td><td>JRE installed instead of JDK, or <code>JAVA_HOME</code> not set</td><td>Redo sections 2.2 and 2.3; run <code>bash checkEnv.sh</code></td></tr>
+<tr><td><code>g++: command not found</code> / <code>cmake: command not found</code></td><td>Compiler or CMake not installed</td><td>Redo section 2.2 for your distribution</td></tr>
+<tr><td><code>./gradlew: Permission denied</code></td><td>Wrapper script is not executable</td><td><code>chmod +x gradlew</code></td></tr>
+<tr><td>Gradle hangs or fails downloading the distribution</td><td>No internet, proxy, or firewall</td><td>Check connectivity; set proxy in <code>~/.gradle/gradle.properties</code> (<code>systemProp.https.proxyHost</code>, <code>systemProp.https.proxyPort</code>)</td></tr>
+<tr><td><code>No matching toolchains found ... Java 17</code></td><td>Gradle cannot see a JDK 17</td><td>Confirm <code>/usr/lib/jvm</code> has JDK 17 and <code>JAVA_HOME</code> points to it, or change <code>languageVersion</code> to the version you installed</td></tr>
+<tr><td><code>snap: command not found</code> / snap package not found</td><td>Distribution has no snap, or the package was renamed</td><td>Use the Toolbox or tarball method in section 2.5</td></tr>
+<tr><td><code>UnsatisfiedLinkError: no nativeBridge in java.library.path</code></td><td>.so not built, or path not set</td><td>Run <code>./gradlew buildNative</code>; confirm <code>systemProperty 'java.library.path'</code> in the <code>run</code> task; check <code>ls build/native/*.so</code></td></tr>
+<tr><td><code>UnsatisfiedLinkError: 'int ...add(int, int)'</code></td><td>Library loaded, but function name/signature in C++ does not match</td><td>Copy the signature from the generated header. Check <code>nm -D ... | grep Java_</code>. If you use C++, make sure the header (with <code>extern "C"</code>) is included.</td></tr>
+<tr><td><code>Could NOT find JNI</code> (CMake)</td><td><code>JAVA_HOME</code> not set or JRE-only</td><td>Install the JDK, export <code>JAVA_HOME</code>, run <code>./gradlew clean buildNative</code></td></tr>
+<tr><td><code>fatal error: com_example_jni_NativeBridge.h: No such file</code></td><td>Header not generated yet, or <code>JNI_HEADER_DIR</code> missing</td><td>Run <code>./gradlew compileJava</code> first; check <code>build/generated/jni/</code></td></tr>
+<tr><td>Header missing a new method</td><td>Stale build</td><td><code>./gradlew clean compileJava</code></td></tr>
+<tr><td><code>NoSuchMethodError</code> in a callback</td><td>Wrong method name or descriptor</td><td>Use <code>javap -s -p</code> to read the real descriptor</td></tr>
+<tr><td>JVM crash (SIGSEGV) in native code</td><td>Null pointer, stale reference, wrong thread</td><td>Run with <code>-Xcheck:jni</code>; review section 13.1; read <code>hs_err_pid*.log</code></td></tr>
+<tr><td>IntelliJ shows red on Gradle sync</td><td>Gradle JVM mismatch</td><td>Settings → Gradle → Gradle JVM = JDK 17, then reload</td></tr>
+<tr><td><code>JAVA_HOME</code> shows <code>java-25-...</code> (or another JDK) when you wanted 17</td><td>Several JDKs installed; the newest is the default</td><td>Follow section 2.3a: <code>update-alternatives --config javac</code> and <code>java</code>, open a new terminal, then <code>./gradlew clean run</code></td></tr>
+<tr><td>IntelliJ run works but terminal fails (or the reverse)</td><td>Two different JDKs in use</td><td>Make IntelliJ's Gradle JVM and your shell's <code>JAVA_HOME</code> point to the same JDK</td></tr>
+</table>
+
+<!-- ============ 15 ============ -->
+<h2 id="cheat"><span class="level">Reference</span>15. Cheat sheet</h2>
+<h3>Blank-machine checklist</h3>
+<ol class="steps">
+<li>Install JDK 17, g++, make, CMake, curl, unzip, git (2.2).</li>
+<li>Set <code>JAVA_HOME</code> in <code>~/.bashrc</code> (2.3).</li>
+<li>Run <code>bash checkEnv.sh</code>; every line must say OK (2.4).</li>
+<li>Install IntelliJ, or SDKMAN Gradle for terminal-only (2.5 / 2.6).</li>
+<li>Create the project, set Gradle JVM to JDK 17 (3).</li>
+<li>Add the six project files (4 to 9) and run <code>./gradlew run</code> (10).</li>
+</ol>
+<h3>Add a new native function: the 6-step loop</h3>
+<ol class="steps">
+<li>Declare <code>public native ...</code> in Java.</li>
+<li><code>./gradlew compileJava</code> to regenerate the header.</li>
+<li>Copy the new signature from the header into <code>nativeBridge.cpp</code>.</li>
+<li>Write the body.</li>
+<li><code>./gradlew run</code>.</li>
+<li>If something fails, jump to section 14.</li>
+</ol>
+<h3>Most-used JNIEnv calls</h3>
+<table>
+<tr><th>Goal</th><th>Call</th></tr>
+<tr><td>Java String to C</td><td><code>GetStringUTFChars</code> then <code>ReleaseStringUTFChars</code></td></tr>
+<tr><td>C string to Java</td><td><code>NewStringUTF</code></td></tr>
+<tr><td>Find a class</td><td><code>FindClass("java/util/ArrayList")</code> or <code>GetObjectClass(obj)</code></td></tr>
+<tr><td>Find an instance method</td><td><code>GetMethodID(cls, "name", "(sig)ret")</code></td></tr>
+<tr><td>Call a method</td><td><code>CallVoidMethod</code>, <code>CallIntMethod</code>, <code>CallObjectMethod</code>, ...</td></tr>
+<tr><td>Read/write a field</td><td><code>GetFieldID</code>, <code>GetIntField</code>, <code>SetIntField</code></td></tr>
+<tr><td>Array copy</td><td><code>GetIntArrayRegion</code>, <code>SetIntArrayRegion</code>, <code>NewIntArray</code></td></tr>
+<tr><td>Throw</td><td><code>ThrowNew(cls, "text")</code> and <code>return</code></td></tr>
+<tr><td>Check for pending exception</td><td><code>ExceptionCheck</code>, <code>ExceptionClear</code></td></tr>
+<tr><td>Keep an object between calls</td><td><code>NewGlobalRef</code> / <code>DeleteGlobalRef</code></td></tr>
+</table>
+<h3>Suggested practice path</h3>
+<ol class="steps">
+<li>Finish sections 1 to 10 and get <code>add</code> working.</li>
+<li>Add your own <code>multiply</code> and a <code>double</code> function.</li>
+<li>Pass a <code>String</code> in and out (section 7), then an <code>int[]</code> (section 12).</li>
+<li>Add the callback (section 11) and change its signature to also pass a <code>double</code>.</li>
+<li>Try the thread example (13.2) and throw an exception from C++ (13.3).</li>
+<li>Run everything with <code>-Xcheck:jni</code> and fix any warnings.</li>
+</ol>
+
+</div>
+
+<script>
+document.querySelectorAll('script[type="text/plain"]').forEach(function (s) {
+  var fig = document.createElement('figure');
+  fig.className = 'code';
+  var cap = document.createElement('figcaption');
+  var label = document.createElement('span');
+  label.textContent = s.dataset.file || s.dataset.lang;
+  var btn = document.createElement('button');
+  btn.textContent = 'Copy';
+  var pre = document.createElement('pre');
+  var code = document.createElement('code');
+  code.textContent = s.textContent.replace(/^\n/, '');
+  pre.appendChild(code);
+  btn.onclick = function () {
+    navigator.clipboard.writeText(code.textContent).then(function () {
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = 'Copy'; }, 1200);
+    });
+  };
+  cap.appendChild(label); cap.appendChild(btn);
+  fig.appendChild(cap); fig.appendChild(pre);
+  s.parentNode.replaceChild(fig, s);
+});
+</script>
+</body>
+</html>
