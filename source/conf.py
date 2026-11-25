@@ -6,8 +6,9 @@ copy buttons on code blocks and tabbed blocks (sphinx-tabs).
 
 The project's README, CLAUDE.md and changeLog.md are included where they
 live (MyST {include}), so the wiki never holds a stale copy of them. The
-wiki's own documents (guides, the code guide .docx, the JNI guide .html) are
-in source/files/. The .html pages, the reports in references/plan/, the
+wiki's internal documents (the Cloudflare and Samba guides, the Gradle
+guides, the code guide .docx) are in ../internalUse/files/, which is never
+published. The .html pages, the reports in references/plan/, the
 tutorial video and the .docx are copied into the built site by
 collect_sources() below, and the .docx is turned into HTML with mammoth.
 
@@ -27,7 +28,8 @@ import shutil
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent              # references/WiKi/source
-FILES = HERE / "files"                              # the wiki's own documents
+INTERNAL = HERE.parent / "internalUse" / "files"    # internal documents, never published
+FILES = HERE / "files"                              # standalone only: what publish.sh copied in
 GENERATED = HERE / "_generated"                     # rebuilt on every build, git-ignored
 # Inside the camp project the wiki reads the project's own files. In the
 # standalone public wiki repository (made by publish.sh) there is no project
@@ -70,9 +72,9 @@ def collect_sources(public):
             shutil.copy2(source, extra / "plan" / source.name)
     if public:
         return
-    for source in FILES.glob("*.html"):
+    for source in INTERNAL.glob("*.html"):
         shutil.copy2(source, extra / source.name)
-    for source in FILES.glob("*.docx"):
+    for source in INTERNAL.glob("*.docx"):
         shutil.copy2(source, extra / source.name)
         try:
             import mammoth
