@@ -9,8 +9,9 @@
   with `references/WiKi/build.sh`.
 - Added: the wiki is published on GitHub Pages from a separate public
   repository (Springmoh/qqCampWiki), cloned at `references/WiKi/public/`:
-  `references/WiKi/publish.sh` copies in only the public part (the user
-  guide and the changelog; the Pages workflow lives only in that
+  `references/WiKi/publish.sh` copies in only the public part (the player
+  guide and the changelog: the staff guides stay internal, as they describe
+  the surprise activities; the Pages workflow lives only in that
   repository) and checks it for private paths; `references/WiKi/build.sh --public` previews it. The wiki's
   internal documents and screenshot tools moved into
   `references/WiKi/internalUse/`, which is never published.

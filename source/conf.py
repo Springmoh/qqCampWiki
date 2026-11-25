@@ -15,11 +15,12 @@ collect_sources() below, and the .docx is turned into HTML with mammoth.
 Two builds:
   * the full wiki, for this computer (build.sh);
   * the public one, `sphinx-build -t public` (build.sh --public, and the
-    GitHub Pages workflow in .github/workflows/wiki.yml): only the user
-    guide and the changelog. Everything in PRIVATE_PAGES stays off the
-    internet: the operations guides name the Cloudflare tunnel and home
-    folders, the reports describe the camp's weak points, and the developer
-    pages carry local paths.
+    GitHub Pages workflow in the public repository): only PUBLIC_PAGES, the
+    home page, the player guide and the changelog. Every other page stays
+    off the internet: the operations guides name the Cloudflare tunnel and
+    home folders, the reports describe the camp's weak points, the developer
+    pages carry local paths, and the staff guides describe the surprise
+    activities (countdown, hall queue) the campers must not read about.
 
 @author Springmoh
 """
@@ -40,10 +41,12 @@ STANDALONE = not (ROOT / "build.gradle").is_file()
 PLAN = FILES if STANDALONE else ROOT / "references" / "plan"     # where the tutorial video is
 ICON = FILES / "app-icon.png" if STANDALONE else ROOT / "frontend" / "img" / "app-icon.png"
 
-# Pages that never go into the public build (the developer changelog stays).
-PRIVATE_PAGES = ["developer/readme.md", "developer/claude.md", "developer/gradleOperationGuide.md",
-                 "developer/gradleJniGuide.md", "developer/codeGuide.md", "developer/tutorialVideo.md",
-                 "developer/wiki.md", "operations/*", "reports/*"]
+# The only pages in the public build; every other page is left out of it. A
+# new public page goes here and in publish.sh's PUBLIC list.
+PUBLIC_PAGES = ["index.md", "userGuide/player.md", "developer/changelog.md"]
+PRIVATE_PAGES = sorted(str(page.relative_to(HERE)) for page in HERE.rglob("*.md")
+                       if str(page.relative_to(HERE)) not in PUBLIC_PAGES
+                       and not page.relative_to(HERE).parts[0].startswith(("_", "files")))
 PUBLIC = tags.has("public")  # noqa: F821 -- Sphinx puts `tags` into this file's namespace
 
 
