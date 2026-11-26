@@ -1,6 +1,6 @@
 # qqCampWebDev Wiki
 
-The player guide of SCMC QQ Camp (v2.0.5): how campers use the camp website on their phones, in
+The player guide of SCMC QQ Camp (v2.0.6): how campers use the camp website on their phones, in
 Chinese, with screenshots and the tutorial video, plus the changelog.
 
 Author: Springmoh

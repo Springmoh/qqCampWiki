@@ -1,5 +1,48 @@
 # Changelog
 
+## v2.0.6 - 2026-11-27
+
+- Added: the console's **Setup** page (`/setup`), for preparing the
+  database before the camp. It exists only while `systemHealth.json` has
+  `"settingUpDatabase": true`, and then needs no sign-in. The live database
+  is only previewed there; it edits a backup in `data/backups/` (a copy of
+  the live one, a new empty camp, or any backup there): the checkpoints
+  (with their spot on the floor map), game masters and players (with an
+  emoji picked from `usersInfo.json`), including renaming them, and Clear
+  Play History. **Load Into Live** then puts that backup in place (the live
+  database is copied to `data/backups/` first). While the flag is on, every
+  other write on every port is refused, check-in taps do nothing, and the
+  camp's timers stand still.
+- Added: **checkpoint sets**, one per camp day, for a camp whose
+  checkpoints (names, places, game masters) change from day to day. The
+  Setup page makes the sets and edits each day's checkpoints and which game
+  master runs which; the console's Checkpoints tab has a **Camp Day** bar
+  that switches the live day. Only that day's checkpoints exist for players
+  and game masters, and each checkpoint keeps its own QR and station link
+  across switches. Switching waits until nobody is checked in, unless
+  `checkpoint.json`'s new `checkpointSets.releaseOnSwitch` is true; its
+  `checkpointSets.suggestedNames` are the names the Setup page offers. The
+  DB editor shows the new tables under Checkpoints.
+- Added: game masters differ by day too. On the Setup page each game master
+  has the days they work; on any other day they cannot sign in (they are
+  told it is not their working day), their open session stops working until
+  their day comes back, and they are left out of the console's and the
+  players' lists, while their account and wallet stay. A database that
+  already had checkpoint sets gives every game master every day.
+- Changed: the wiki is published on GitHub Pages from a separate public
+  repository (Springmoh/qqCampWiki), cloned at `references/WiKi/public/`:
+  `references/WiKi/publish.sh` copies in only the public part (the player
+  guide and the changelog: the staff guides stay internal, as they describe
+  the surprise activities; the Pages workflow lives only in that
+  repository) and checks it for private paths; `references/WiKi/build.sh
+  --public` previews it. The wiki's internal documents and screenshot tools
+  moved into `references/WiKi/internalUse/`, which is never published, and
+  this repository's `.github/workflows/wiki.yml` was removed.
+- Changed: the tutorial video's iPhone "Add to Home Screen" part is a real
+  screen recording instead of a drawing (the Share sheet's contacts painted
+  over, the other apps blurred), and the wiki's player guide shows its steps
+  as screenshots (⋯ → Share → Add to Home Screen → Add).
+
 ## v2.0.5 - 2026-11-25
 
 - Added: `references/WiKi/`, the qqCampWebDev Wiki (Sphinx, Read the Docs
@@ -7,18 +50,10 @@
   the event team and the console, with fresh screenshots and the tutorial
   video, plus the README, CLAUDE.md, changelog, guides and reports. Build it
   with `references/WiKi/build.sh`.
-- Added: the wiki is published on GitHub Pages from a separate public
-  repository (Springmoh/qqCampWiki), cloned at `references/WiKi/public/`:
-  `references/WiKi/publish.sh` copies in only the public part (the player
-  guide and the changelog: the staff guides stay internal, as they describe
-  the surprise activities; the Pages workflow lives only in that
-  repository) and checks it for private paths; `references/WiKi/build.sh --public` previews it. The wiki's
-  internal documents and screenshot tools moved into
-  `references/WiKi/internalUse/`, which is never published.
-- Changed: the tutorial video's iPhone "Add to Home Screen" part is a real
-  screen recording instead of a drawing (the Share sheet's contacts painted
-  over, the other apps blurred), and the wiki's player guide shows its steps
-  as screenshots (⋯ → Share → Add to Home Screen → Add).
+- Added: `.github/workflows/wiki.yml` publishes the public wiki (the user
+  guide and the changelog only) on GitHub Pages; `references/WiKi/build.sh
+  --public` previews it. The wiki's own documents moved into
+  `references/WiKi/source/files/`.
 - Added: the DB editor's **Change Log** tab. Every change it makes (edit,
   add, delete, password, restore) is recorded with the old and new values in
   `data/qqcamp.db-changelog`, and each has a **Revert** button. A revert
