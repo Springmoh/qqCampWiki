@@ -15,6 +15,10 @@
   repository) and checks it for private paths; `references/WiKi/build.sh --public` previews it. The wiki's
   internal documents and screenshot tools moved into
   `references/WiKi/internalUse/`, which is never published.
+- Changed: the tutorial video's iPhone "Add to Home Screen" part is a real
+  screen recording instead of a drawing (the Share sheet's contacts painted
+  over, the other apps blurred), and the wiki's player guide shows its steps
+  as screenshots (⋯ → Share → Add to Home Screen → Add).
 - Added: the DB editor's **Change Log** tab. Every change it makes (edit,
   add, delete, password, restore) is recorded with the old and new values in
   `data/qqcamp.db-changelog`, and each has a **Revert** button. A revert

@@ -48,11 +48,41 @@ Welcome On Board：出发吧！或跳过教程
 `````{tabs}
 ````{tab} iPhone（Safari）
 1. 用 **Safari** 打开 game.scmcqqcamp.com。
-2. 按画面下方中间的 **分享** 按钮（方框加向上箭头）。
-3. 往下滑，按 **添加到主屏幕**。
-4. 右上角按 **添加**。主屏幕上就会出现 QQ Camp 的图标。
+2. 按右下角的 **⋯**，再按 **分享**（Share）。
+   如果你的 Safari 画面下方中间就有 **分享** 按钮（方框加向上箭头），直接按它。
+3. 往上滑，按 **添加到主屏幕**（Add to Home Screen）。
+4. **作为网页 App 打开**（Open as Web App）保持打开，按右上角的 **添加**（Add）。
+   主屏幕上就会出现 QQ Camp 的图标。
 
 一定要用 Safari，其他浏览器（例如 Chrome、微信里打开的网页）没有这个选项。
+
+:::{container} shots
+```{figure} images/ios-home-1.png
+:class: phone
+
+按右下角的 ⋯
+```
+```{figure} images/ios-home-2.png
+:class: phone
+
+按分享 Share
+```
+```{figure} images/ios-home-3.png
+:class: phone
+
+往上滑，按添加到主屏幕
+```
+```{figure} images/ios-home-4.png
+:class: phone
+
+按右上角的添加 Add
+```
+```{figure} images/ios-home-5.png
+:class: phone
+
+主屏幕上的 QQ Camp
+```
+:::
 ````
 ````{tab} Android（Chrome）
 1. 用 **Chrome** 打开 game.scmcqqcamp.com。
